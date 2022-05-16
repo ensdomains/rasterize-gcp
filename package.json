@@ -1,0 +1,18 @@
+{
+    "name": "rasterize",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "scripts": {
+      "test": "echo \"Error: no test specified\" && exit 1",
+      "start": "node app.js"
+    },
+    "author": "Muhammed Tanrıkulu <muhammed@ens.domains>",
+    "license": "MIT",
+    "dependencies": {
+      "express": "^4.17.2",
+      "puppeteer": "^13.0.0",
+      "@zhaow-de/puppeteer-cluster": "^0.29.0"
+    }
+  }
+  
