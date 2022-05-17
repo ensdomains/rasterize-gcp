@@ -45,6 +45,11 @@ const minimal_args = [
   '--use-mock-keychain',
 ];
 
+const resolutionMultiplier = Object.freeze({
+  low: 1,
+  high: 4,
+});
+
 // relative path causes more memory usage
 const tempData = '/tmp';
 
@@ -61,58 +66,76 @@ const handleWithError = (promise) => {
 };
 
 (async () => {
-    // create puppeteer cluster for parallel task execution
-    const cluster = await Cluster.launch({
-        concurrency: Cluster.CONCURRENCY_PAGE,
-        maxConcurrency: 10,
-        puppeteerOptions: {
-            args: minimal_args,
-            userDataDir: tempData,
-        }
+  // create puppeteer cluster for parallel task execution
+  const cluster = await Cluster.launch({
+    concurrency: Cluster.CONCURRENCY_PAGE,
+    maxConcurrency: 10,
+    puppeteerOptions: {
+      args: minimal_args,
+      userDataDir: tempData,
+    },
+  });
+  // add screenshot task for each cluster
+  await cluster.task(async ({ page, data: { url, resolution } }) => {
+    await page.goto(url);
+    // increase device scale factor for better image quality
+    await page.setViewport({ width: 2000, height: 2000, deviceScaleFactor: 2 });
+    // wait for svg to be retrieved and rendered
+    const [_, waitError] = await handleWithError(
+      page.waitForSelector('svg', { visible: true, timeout: 5000 })
+    );
+    // if no result shows up then exit task
+    if (waitError) {
+      return false;
+    }
+    // if high res image in demand then resize the svg
+    if (resolution > 1) {
+      let svgContent = await page.$('svg');
+      await svgContent.evaluate((el) => {
+        el.style.width = 270 * resolution + 'px';
+        el.style.height = 270 * resolution + 'px';
+      });
+      console.log('svgContent', svgContent);
+    }
+    // if image exist take a screenshot
+    const imageBuffer = await page.screenshot({
+      clip: {
+        x: 0,
+        y: 0,
+        width: 270 * resolution,
+        height: 270 * resolution,
+      },
     });
-    // add screenshot task for each cluster
-    await cluster.task(async ({ page, data: url }) => {
-        await page.goto(url);
-        // wait for svg to be retrieved and rendered
-        const [_, waitError] = await handleWithError(
-            page.waitForSelector('svg', { visible: true, timeout: 5000 })
-        );
-        // if no result shows up then exit task
-        if (waitError) {
-            return false;
-        }
-        // if image exist take a screenshot
-        const imageBuffer = await page.screenshot({
-            clip: { x: 0, y: 0, width: 270, height: 270 },
-        });
-        return imageBuffer;
-    });
+    return imageBuffer;
+  });
 
-    const rasterize = async (req, res) => {
-        const { contractAddress, networkName, tokenId } = req.body;
-        if (!contractAddress || !networkName || !tokenId) {
-            res.status(400).send("One or more parameters are missing");
-            return;
-        }
-        const svgUrl = `${serviceUrl}/${networkName}/${contractAddress}/${tokenId}/image`;
-        // execute task to retrieve screenshot image buffer back
-        const imageBuffer = await cluster.execute(svgUrl);
-        if (imageBuffer === false) {
-            res.status(404).send(`Not found`);
-            return;
-        }
-        res.set('Content-Type', 'image/png');
-        res.send(imageBuffer);
-    };
+const rasterize = async (req, res) => {
+    const { contractAddress, networkName, tokenId } = req.body;
+    if (!contractAddress || !networkName || !tokenId) {
+      res.status(400).send('One or more parameters are missing');
+      return;
+    }
+    const resolution =
+      resolutionMultiplier[req.query.res] || resolutionMultiplier.low;
+    const svgUrl = `${serviceUrl}/${networkName}/${contractAddress}/${tokenId}/image`;
+    // execute task to retrieve screenshot image buffer back
+    const imageBuffer = await cluster.execute({ url: svgUrl, resolution });
+    if (imageBuffer === false) {
+      res.status(404).send(`Not found`);
+      return;
+    }
+    res.set('Content-Type', 'image/png');
+    res.send(imageBuffer);
+  };
 
-    const app = express();
+  const app = express();
 
-    app.use(express.json());
-    app.post('/rasterize', rasterize);
+  app.use(express.json());
+  app.post('/rasterize', rasterize);
 
-    const port = process.env.PORT || 8080;
+  const port = process.env.PORT || 8080;
 
-    app.listen(port, () => {
+  app.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`);
-    });
+  });
 })();
