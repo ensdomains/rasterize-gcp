@@ -90,8 +90,9 @@ const handleWithError = (promise) => {
 
     const rasterize = async (req, res) => {
         const { contractAddress, networkName, tokenId } = req.body;
-        if (!contractAddress | !networkName | !tokenId) {
+        if (!contractAddress || !networkName || !tokenId) {
             res.status(400).send("One or more parameters are missing");
+            return;
         }
         const svgUrl = `${serviceUrl}/${networkName}/${contractAddress}/${tokenId}/image`;
         // execute task to retrieve screenshot image buffer back
