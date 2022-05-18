@@ -79,7 +79,9 @@ const handleWithError = (promise) => {
   await cluster.task(async ({ page, data: { url, resolution } }) => {
     await page.goto(url);
     // increase device scale factor for better image quality
-    await page.setViewport({ width: 2000, height: 2000, deviceScaleFactor: 2 });
+    if (resolution > 1) {
+      await page.setViewport({ width: 2000, height: 2000, deviceScaleFactor: 2 });
+    }
     // wait for svg to be retrieved and rendered
     const [_, waitError] = await handleWithError(
       page.waitForSelector('svg', { visible: true, timeout: 5000 })
@@ -90,12 +92,11 @@ const handleWithError = (promise) => {
     }
     // if high res image in demand then resize the svg
     if (resolution > 1) {
-      let svgContent = await page.$('svg');
-      await svgContent.evaluate((el) => {
-        el.style.width = 270 * resolution + 'px';
-        el.style.height = 270 * resolution + 'px';
-      });
-      console.log('svgContent', svgContent);
+      const svgContent = await page.$('svg');
+      await svgContent.evaluate((el, resolution) => {
+        el.style.width = `${270 * resolution}px`;
+        el.style.height = `${270 * resolution}px`;
+      }, resolution);
     }
     // if image exist take a screenshot
     const imageBuffer = await page.screenshot({
@@ -119,13 +120,18 @@ const rasterize = async (req, res) => {
       resolutionMultiplier[req.query.res] || resolutionMultiplier.low;
     const svgUrl = `${serviceUrl}/${networkName}/${contractAddress}/${tokenId}/image`;
     // execute task to retrieve screenshot image buffer back
-    const imageBuffer = await cluster.execute({ url: svgUrl, resolution });
-    if (imageBuffer === false) {
-      res.status(404).send(`Not found`);
-      return;
+    try {
+      const imageBuffer = await cluster.execute({ url: svgUrl, resolution });
+      if (imageBuffer === false) {
+        res.status(404).send(`Not found`);
+        return;
+      }
+      res.set('Content-Type', 'image/png');
+      res.send(imageBuffer);
+    } catch (error) {
+      console.warn('warning:', error);
+      res.status(500).send(error);
     }
-    res.set('Content-Type', 'image/png');
-    res.send(imageBuffer);
   };
 
   const app = express();
