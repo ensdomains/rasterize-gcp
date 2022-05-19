@@ -47,7 +47,7 @@ const minimal_args = [
 
 const resolutionMultiplier = Object.freeze({
   low: 1,
-  high: 4,
+  high: 2,
 });
 
 // relative path causes more memory usage
@@ -80,7 +80,11 @@ const handleWithError = (promise) => {
     await page.goto(url);
     // increase device scale factor for better image quality
     if (resolution > 1) {
-      await page.setViewport({ width: 2000, height: 2000, deviceScaleFactor: 2 });
+      await page.setViewport({
+        width: 2000,
+        height: 2000,
+        deviceScaleFactor: 2,
+      });
     }
     // wait for svg to be retrieved and rendered
     const [_, waitError] = await handleWithError(
@@ -110,7 +114,7 @@ const handleWithError = (promise) => {
     return imageBuffer;
   });
 
-const rasterize = async (req, res) => {
+  const rasterize = async (req, res) => {
     const { contractAddress, networkName, tokenId } = req.body;
     if (!contractAddress || !networkName || !tokenId) {
       res.status(400).send('One or more parameters are missing');
