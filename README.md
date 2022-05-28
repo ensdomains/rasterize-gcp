@@ -8,6 +8,12 @@ ENS rasterization service that rasterize ENS NFT vectoral images to PNG.
 
 ### POST:
 
+#### Query:
+- `res`: Predefined image resolution. (_low_ | _high_) Default: `low`
+<br/>
+e.g. `http://localhost:8080/rasterize?res=high`
+
+#### Body:
 - `networkName`: Network name (_mainnet_ | _rinkeby_ ...)
 - `contractAddress`: ENS Base Registrar Contract address for v1, NameWrapper Contract address for v2
 - `tokenId`: Labelhash(v1) /Namehash(v2) of your ENS name.
