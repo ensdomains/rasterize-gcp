@@ -77,7 +77,23 @@ const handleWithError = (promise) => {
   });
   // add screenshot task for each cluster
   await cluster.task(async ({ page, data: { url, resolution } }) => {
-    await page.goto(url);
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8"> 
+        <title>ENS Rasterization</title>
+      </head>
+      <body style="margin: 0;">
+        <img src="${serviceUrl}/${networkName}/${contractAddress}/${tokenId}/image"/>
+      </body>
+    </html>
+    `;
+
+    let [_g, gotoError] = await handleWithError(page.setContent(htmlContent));
+    if (gotoError) {
+      return false;
+    }
     // increase device scale factor for better image quality
     if (resolution > 1) {
       await page.setViewport({
@@ -88,7 +104,7 @@ const handleWithError = (promise) => {
     }
     // wait for svg to be retrieved and rendered
     const [_, waitError] = await handleWithError(
-      page.waitForSelector('svg', { visible: true, timeout: 5000 })
+      page.waitForSelector('img', { visible: true, timeout: 5000 })
     );
     // if no result shows up then exit task
     if (waitError) {
@@ -96,8 +112,8 @@ const handleWithError = (promise) => {
     }
     // if high res image in demand then resize the svg
     if (resolution > 1) {
-      const svgContent = await page.$('svg');
-      await svgContent.evaluate((el, resolution) => {
+      const imgContent = await page.$('img');
+      await imgContent.evaluate((el, resolution) => {
         el.style.width = `${270 * resolution}px`;
         el.style.height = `${270 * resolution}px`;
       }, resolution);
@@ -122,10 +138,10 @@ const handleWithError = (promise) => {
     }
     const resolution =
       resolutionMultiplier[req.query.res] || resolutionMultiplier.low;
-    const svgUrl = `${serviceUrl}/${networkName}/${contractAddress}/${tokenId}/image`;
+    const imageUrl = `${serviceUrl}/${networkName}/${contractAddress}/${tokenId}/image`;
     // execute task to retrieve screenshot image buffer back
     try {
-      const imageBuffer = await cluster.execute({ url: svgUrl, resolution });
+      const imageBuffer = await cluster.execute({ url: imageUrl, resolution });
       if (imageBuffer === false) {
         res.status(404).send(`Not found`);
         return;
