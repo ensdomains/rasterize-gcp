@@ -1,6 +1,7 @@
 const fs = require('fs');
 const { Cluster } = require('@zhaow-de/puppeteer-cluster');
 const express = require('express');
+const { createUniversalValidation, ValidationConfigs } = require('./validation');
 
 // original gcp endpoint of metadata service
 const serviceUrl = 'https://ens-metadata-service.appspot.com';
@@ -17,16 +18,13 @@ const minimal_args = [
   '--disable-dev-shm-usage',
   '--disable-domain-reliability',
   '--disable-extensions',
-  '--disable-features=AudioServiceOutOfProcess',
+  '--disable-features=AudioServiceOutOfProcess,VizDisplayCompositor',
   '--disable-hang-monitor',
-  '--disable-ipc-flooding-protection',
   '--disable-notifications',
   '--disable-offer-store-unmasked-wallet-cards',
-  '--disable-popup-blocking',
   '--disable-print-preview',
   '--disable-prompt-on-repost',
   '--disable-renderer-backgrounding',
-  '--disable-setuid-sandbox',
   '--disable-speech-api',
   '--disable-sync',
   '--hide-scrollbars',
@@ -36,13 +34,18 @@ const minimal_args = [
   '--no-default-browser-check',
   '--no-first-run',
   '--no-pings',
-  '--no-sandbox',
   '--no-zygote',
   '--password-store=basic',
   '--proxy-bypass-list=*',
   '--proxy-server="direct://"',
   '--use-gl=swiftshader',
   '--use-mock-keychain',
+  // Security-focused additions
+  '--disable-javascript',
+  '--disable-plugins',
+  '--disable-web-security',
+  '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+  '--block-new-web-contents',
 ];
 
 const resolutionMultiplier = Object.freeze({
@@ -81,7 +84,14 @@ const handleWithError = (promise) => {
     <!DOCTYPE html>
     <html>
       <head>
-        <meta charset="UTF-8"> 
+        <meta charset="UTF-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https://ens-metadata-service.appspot.com; style-src 'unsafe-inline';">
+        <meta http-equiv="X-Content-Type-Options" content="nosniff">
+        <meta http-equiv="X-Frame-Options" content="DENY">
+        <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+        <meta http-equiv="Referrer-Policy" content="no-referrer">
+        <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(), camera=()">
+        <meta http-equiv="refresh" content="0; url=about:blank" disabled>
         <title>ENS Rasterization</title>
       </head>
       <body style="margin: 0;">
@@ -130,8 +140,19 @@ const handleWithError = (promise) => {
     return imageBuffer;
   });
 
+  const validationMiddleware = createUniversalValidation(ValidationConfigs.production);
+
   const rasterize = async (req, res) => {
-    const { contractAddress, networkName, tokenId } = req.body;
+    // Apply validation middleware
+    await new Promise((resolve, reject) => {
+      validationMiddleware(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Use validated parameters
+    const { contractAddress, networkName, tokenId } = req.validatedParams || req.body;
     if (!contractAddress || !networkName || !tokenId) {
       res.status(400).send('One or more parameters are missing');
       return;

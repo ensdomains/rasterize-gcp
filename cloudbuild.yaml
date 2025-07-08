@@ -1,0 +1,23 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/ensdomains/rasterize', '.']
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/ensdomains/rasterize']
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      [
+        'run',
+        'deploy',
+        'rasterize',
+        '--image',
+        'gcr.io/ensdomains/rasterize',
+        '--region',
+        'us-central1',
+        '--no-traffic',
+      ]
+images:
+  - gcr.io/ensdomains/rasterize
