@@ -1,10 +1,10 @@
 steps:
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/ensdomains/rasterize', '.']
-  # Push the container image to Container Registry
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/ens-metadata-service/cloud-run-source-deploy/rasterize', '.']
+  # Push the container image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/ensdomains/rasterize']
+    args: ['push', 'us-central1-docker.pkg.dev/ens-metadata-service/cloud-run-source-deploy/rasterize']
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -14,10 +14,10 @@ steps:
         'deploy',
         'rasterize',
         '--image',
-        'gcr.io/ensdomains/rasterize',
+        'us-central1-docker.pkg.dev/ens-metadata-service/cloud-run-source-deploy/rasterize',
         '--region',
         'us-central1',
         '--no-traffic',
       ]
 images:
-  - gcr.io/ensdomains/rasterize
+  - us-central1-docker.pkg.dev/ens-metadata-service/cloud-run-source-deploy/rasterize
