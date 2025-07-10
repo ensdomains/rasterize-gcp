@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 node:16
+FROM --platform=linux/amd64 node:22
 
 # Adds required libs to make puppeteer work properly in Debian
 RUN apt-get update && \
